@@ -4,10 +4,22 @@
     "description": "Snipe op veilingen",
     "version": "1.0",
     "browser_action": {
-        "default_icon": "icon.png",
-        "default_popup": "popup.html"
+        "default_icon": "icon.png"
     },
-    "permissions": [
-        "activeTab"
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.vakantieveilingen.nl/*"
+            ],
+            "css": [
+                "sniper.css"
+            ],
+            "js": [
+                "sniper.js"
+            ]
+        }
+    ],
+    "web_accessible_resources": [
+        "icon.png"
     ]
 }
