@@ -1,5 +1,5 @@
 (function () {
-    var max_bid = 0;
+    var saved_max_bid = 0;
     var active = false;
     var reloading = false;
     var intervalTimer = null;
@@ -20,21 +20,30 @@
             var max_bid = parseInt(max_bid_div.value);
             var bid_input = document.querySelector('.bid-input');
 
+            // Save to
+            if (max_bid !== saved_max_bid) {
+                var store = {};
+                store[window.location.pathname] = max_bid;
+                chrome.storage.local.set(store);
+                saved_max_bid = max_bid;
+            }
+
             // Fill in a winning bid
             var winning_bid = highest_bid + 1;
             if (isNaN(max_bid)) {
                 setState("Geen max bod ingevuld")
+                bid_input.value = '';
             } else if (winning_bid > max_bid) {
-                setState("Hoogste bod (€" + highest_bid + ") is hoger dan max bod :(");
+                setState("Winnende bod (€" + winning_bid + ") is hoger dan max bod :(");
+                bid_input.value = '';
             } else {
                 setState("Gereed om €" + winning_bid + " te bieden op 00:00:01");
                 bid_input.value = winning_bid;
+                if (time === '00:00:01') {
+                    alert('WIN met ' + winning_bid);
+                }
             }
-
-
-
         }
-
     }
 
     // Add the UI
@@ -85,6 +94,8 @@
                 toggleButton.innerText = 'Snipe!';
                 window.clearInterval(intervalTimer);
                 setState("");
+
+                chrome.storage.local.clear();
             }
         }
 
@@ -97,6 +108,14 @@
             e.preventDefault();
             toggleSniping()
         });
+
+        // Check if it should already be enabled from a previous page
+        chrome.storage.local.get(window.location.pathname, function (store) {
+            if (store[window.location.pathname]) {
+                max_bid_div.value = store[window.location.pathname];
+                toggleSniping();
+            }
+        })
     }
 
 
