@@ -1,122 +1,210 @@
 (function () {
-    var saved_max_bid = 0;
-    var active = false;
-    var reloading = false;
-    var intervalTimer = null;
+    // Logic 
+    function Sniper() {
+        var auction_page = new AuctionPage(this);
+        var sniper_box = new SniperBox(this);
 
-    function check() {
-        var lost_auction_button = document.querySelector('.lostAuction + .pay-your-auction');
+        var max_bid = null;
+        var interval_timer = null;
+        var active = false;
+        var bid_placed = false;
 
-        if (lost_auction_button !== null) {
-            if (!reloading) {
-                lost_auction_button.click();
-                reloading = true;
+        // Check if we are still active from the previous page
+        getBidForPage((saved_max_bid) => {
+            if(saved_max_bid) {
+                max_bid = saved_max_bid;
+                sniper_box.setMaxBid(max_bid);
+                this.toggleClicked();
             }
+        })
 
-        } else {
-            // Auction in progress (probably), gather information and return to central
-            var time = document.querySelector('.time-container').innerText;
-            var highest_bid = parseInt(document.querySelector('.highest-bid .highest-bid').innerText);
-            var max_bid = parseInt(max_bid_div.value);
-            var bid_input = document.querySelector('.bid-input');
-
-            // Save to
-            if (max_bid !== saved_max_bid) {
-                var store = {};
-                store[window.location.pathname] = max_bid;
-                chrome.storage.local.set(store);
-                saved_max_bid = max_bid;
+        this.maxBidChanged = function(new_max_bid) {
+            max_bid = new_max_bid;
+            if(active) {
+                saveBidForPage(max_bid);
+                check();
             }
+        }
 
-            // Fill in a winning bid
-            var winning_bid = highest_bid + 1;
-            if (isNaN(max_bid)) {
-                setState("Geen max bod ingevuld")
-                bid_input.value = '';
-            } else if (winning_bid > max_bid) {
-                setState("Winnende bod (€" + winning_bid + ") is hoger dan max bod :(");
-                bid_input.value = '';
+        this.toggleClicked = function() {
+            active = !active;
+            if(active) {
+                sniper_box.setActive();
+                sniper_box.setToggleButtonText('Stop');
+                startChecking();
+                saveBidForPage(max_bid);
             } else {
-                setState("Gereed om €" + winning_bid + " te bieden op 00:00:01");
-                bid_input.value = winning_bid;
-                if (time === '00:00:01') {
-                    alert('WIN met ' + winning_bid);
+                sniper_box.setInactive();
+                sniper_box.setToggleButtonText('Snipe!');
+                stopChecking();
+                clearBidForPage();
+                sniper_box.setState("");
+            }
+        }
+
+        function startChecking() {
+            interval_timer = window.setInterval(check, 500);
+            check();
+        }
+
+        function stopChecking() {
+            window.clearInterval(interval_timer);
+        }
+
+        // Function that is continuously executed when sniping is active
+        function check() {
+            if(auction_page.tryNavigatingToNextAuction()) {
+                // Navigating away, no more checking
+                sniper_box.setState("Naar de volgende veiling toegaan...");
+                stopChecking();
+                return;
+            }
+
+            var highest_bid = auction_page.getHighestBid();
+            var winning_bid = highest_bid + 1;
+
+            if (bid_placed) {
+                sniper_box.setState("Bod gedaan");
+            } else if (max_bid === null) {
+                sniper_box.setState("Geen max bod ingevuld")
+            } else if (winning_bid > max_bid) {
+                sniper_box.setState("Winnende bod (€" + winning_bid + ") is hoger dan max bod (€" + max_bid + ")");
+            } else {
+                sniper_box.setState("Gereed om €" + winning_bid + " te bieden op 00:00:00");
+                if (auction_page.getTimeRemaining() === '00:00:00') {
+                    auction_page.fillInBid(winning_bid);
+                    auction_page.placeBid();
+                    bid_placed = true;
+                    stopChecking();
                 }
             }
         }
+
+        // Storage functions
+        function saveBidForPage(bid) {
+            var store = {};
+            store[window.location.pathname] = bid;
+            chrome.storage.local.set(store);
+        }
+
+        function clearBidForPage() {
+            chrome.storage.local.clear();
+        }
+
+        function getBidForPage(callback) {
+            chrome.storage.local.get(window.location.pathname, function (store) {
+                if (store[window.location.pathname]) {
+                    callback(store[window.location.pathname]);
+                } else {
+                    callback(null);
+                }
+            });
+        }
     }
 
-    // Add the UI
-    var sniper_div = document.createElement('div');
-    sniper_div.innerHTML = `
-    <div class="sniper">
-        <span class="status active">Sniping...</span>
-        <span class="status inactive">Not sniping</span>
-        <img src="" class="icon">
+    // Interfacing with the vakantieveilingen auction page
+    function AuctionPage(sniper) {
+        var bid_input = document.querySelector('.bid-input');
+        var time_container_div = document.querySelector('.time-container');
+        var bid_button = document.querySelector('#jsActiveBidButton');
 
-        <form>
-            Max bod: €<input class="max_bid" pattern="[0-9]+" required>
-            <button type="submit" class="toggle">Snipe!</button>
-            <div class="state"></div>
-        </form>
-    </div>
-    `;
-    sniper_div = sniper_div.querySelector('.sniper');
-    var state_div = sniper_div.querySelector('.state');
-    var image = sniper_div.querySelector('.icon');
-    var toggleButton = sniper_div.querySelector('.toggle');
-    var max_bid_div = sniper_div.querySelector('.max_bid');
-
-    max_bid_div.addEventListener('input', function () {
-        if (active) {
-            check();
-        }
-    })
-
-    var biddingBlock = document.querySelector('#biddingBlock');
-
-    if (biddingBlock) {
-
-
-        function setState(state) {
-            state_div.innerText = state;
+        // Returns a string with the remaining time
+        this.getTimeRemaining = function() {
+            return time_container_div.innerText;    
         }
 
-        function toggleSniping() {
-            active = !active;
-            if (active) {
-                sniper_div.classList.add('active');
-                toggleButton.innerText = 'Stop';
-                intervalTimer = window.setInterval(check, 500);
-                check();
+        this.getHighestBid = function() {
+            return parseInt(document.querySelector('.highest-bid .highest-bid').innerText);
+        }
+
+        this.fillInBid = function(bid) {
+            bid_input.value = bid;
+        }
+
+        this.placeBid = function() {
+            bid_button.click();
+        }
+
+        this.tryNavigatingToNextAuction = function() {
+            var next_auction_button = document.querySelector('.lostAuction + .pay-your-auction') || document.querySelector('.second-laugh:not(.hidden) .back-to-bidding-btn');
+            if(next_auction_button) {
+                next_auction_button.click();
+                return true;
             } else {
-                sniper_div.classList.remove('active');
-                toggleButton.innerText = 'Snipe!';
-                window.clearInterval(intervalTimer);
-                setState("");
-
-                chrome.storage.local.clear();
-            }
+                return false;
+            }            
         }
+    }
 
-        biddingBlock.appendChild(sniper_div);
+    // Interfacing with the sniperbox on the page
+    function SniperBox(sniper) {
+        // Create the DOM
+        var temp_body = document.createElement('body');
+        temp_body.innerHTML = `
+        <div class="sniper">
+            <span class="status active">Sniping...</span>
+            <span class="status inactive">Not sniping</span>
+            <img src="" class="icon">
+    
+            <form>
+                Max bod: €<input class="max_bid" pattern="[0-9]+" required>
+                <button type="submit" class="toggle">Snipe!</button>
+                <div class="state"></div>
+            </form>
+        </div>
+        `;
 
+        // Get references to the DOM
+        var sniper_div = temp_body.querySelector('.sniper');
+        var state_div = sniper_div.querySelector('.state');
+        var image = sniper_div.querySelector('.icon');
+        var toggle_button = sniper_div.querySelector('.toggle');
+        var max_bid_input = sniper_div.querySelector('.max_bid');
 
-        image.src = chrome.extension.getURL('icon.png');
-
-        sniper_div.querySelector('form').addEventListener('submit', function (e) {
-            e.preventDefault();
-            toggleSniping()
+        max_bid_input.addEventListener('input', function () {
+            if(this.value === '') {
+                sniper.maxBidChanged(null);
+            } else {
+                sniper.maxBidChanged(parseInt(this.value));
+            }            
         });
 
-        // Check if it should already be enabled from a previous page
-        chrome.storage.local.get(window.location.pathname, function (store) {
-            if (store[window.location.pathname]) {
-                max_bid_div.value = store[window.location.pathname];
-                toggleSniping();
-            }
-        })
+        image.src = chrome.extension.getURL('icon.png');
+        
+        sniper_div.querySelector('form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            sniper.toggleClicked();
+        });
+
+
+        // Add to DOM
+        var biddingBlock = document.querySelector('#biddingBlock');
+        
+        if(biddingBlock) {
+            biddingBlock.appendChild(sniper_div);
+        }
+
+        // Public functions
+        this.setMaxBid = function(max_bid) {
+            max_bid_input.value = max_bid;
+        }
+
+        this.setActive = function() {
+            sniper_div.classList.add('active');
+        }
+
+        this.setInactive = function() {
+            sniper_div.classList.remove('active');
+        }
+
+        this.setState = function(text) {
+            state_div.innerText = text;
+        }
+
+        this.setToggleButtonText = function(text) {
+            toggle_button.innerText = text;
+        }
     }
 
-
+    new Sniper();
 })();
