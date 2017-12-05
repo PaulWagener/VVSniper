@@ -3,6 +3,10 @@
     "name": "Vakantie Veilingen Sniper",
     "description": "Snipe op veilingen",
     "version": "1.0",
+    "icons": {
+        "48": "icon.png",
+        "128": "icon.png"
+    },
     "browser_action": {
         "default_icon": "icon.png"
     },
@@ -20,7 +24,7 @@
         }
     ],
     "web_accessible_resources": [
-        "icon.png"
+        "icon-128.png"
     ],
     "permissions": [
         "storage"

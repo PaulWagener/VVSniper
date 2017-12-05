@@ -1,5 +1,5 @@
 (function () {
-    // Logic 
+    // Logic
     function Sniper() {
         var auction_page = new AuctionPage(this);
         var sniper_box = new SniperBox(this);
@@ -11,24 +11,24 @@
 
         // Check if we are still active from the previous page
         getBidForPage((saved_max_bid) => {
-            if(saved_max_bid) {
+            if (saved_max_bid) {
                 max_bid = saved_max_bid;
                 sniper_box.setMaxBid(max_bid);
                 this.toggleClicked();
             }
         })
 
-        this.maxBidChanged = function(new_max_bid) {
+        this.maxBidChanged = function (new_max_bid) {
             max_bid = new_max_bid;
-            if(active) {
+            if (active) {
                 saveBidForPage(max_bid);
                 check();
             }
         }
 
-        this.toggleClicked = function() {
+        this.toggleClicked = function () {
             active = !active;
-            if(active) {
+            if (active) {
                 sniper_box.setActive();
                 sniper_box.setToggleButtonText('Stop');
                 startChecking();
@@ -53,7 +53,7 @@
 
         // Function that is continuously executed when sniping is active
         function check() {
-            if(auction_page.tryNavigatingToNextAuction()) {
+            if (auction_page.tryNavigatingToNextAuction()) {
                 // Navigating away, no more checking
                 sniper_box.setState("Naar de volgende veiling toegaan...");
                 stopChecking();
@@ -109,30 +109,33 @@
         var bid_button = document.querySelector('#jsActiveBidButton');
 
         // Returns a string with the remaining time
-        this.getTimeRemaining = function() {
-            return time_container_div.innerText;    
+        this.getTimeRemaining = function () {
+            return time_container_div.innerText;
         }
 
-        this.getHighestBid = function() {
+        this.getHighestBid = function () {
             return parseInt(document.querySelector('.highest-bid .highest-bid').innerText);
         }
 
-        this.fillInBid = function(bid) {
+        this.fillInBid = function (bid) {
             bid_input.value = bid;
         }
 
-        this.placeBid = function() {
+        this.placeBid = function () {
             bid_button.click();
         }
 
-        this.tryNavigatingToNextAuction = function() {
+        this.tryNavigatingToNextAuction = function () {
             var next_auction_button = document.querySelector('.lostAuction + .pay-your-auction') || document.querySelector('.second-laugh:not(.hidden) .back-to-bidding-btn');
-            if(next_auction_button) {
-                next_auction_button.click();
+            if (next_auction_button) {
+                // Timeout to prevent a 'next auction is closed'
+                window.setTimeout(() => {
+                    next_auction_button.click();
+                }, 3000);
                 return true;
             } else {
                 return false;
-            }            
+            }
         }
     }
 
@@ -145,7 +148,7 @@
             <span class="status active">Sniping...</span>
             <span class="status inactive">Not sniping</span>
             <img src="" class="icon">
-    
+
             <form>
                 Max bod: €<input class="max_bid" pattern="[0-9]+" required>
                 <button type="submit" class="toggle">Snipe!</button>
@@ -162,15 +165,15 @@
         var max_bid_input = sniper_div.querySelector('.max_bid');
 
         max_bid_input.addEventListener('input', function () {
-            if(this.value === '') {
+            if (this.value === '') {
                 sniper.maxBidChanged(null);
             } else {
                 sniper.maxBidChanged(parseInt(this.value));
-            }            
+            }
         });
 
         image.src = chrome.extension.getURL('icon.png');
-        
+
         sniper_div.querySelector('form').addEventListener('submit', function (e) {
             e.preventDefault();
             sniper.toggleClicked();
@@ -179,29 +182,29 @@
 
         // Add to DOM
         var biddingBlock = document.querySelector('#biddingBlock');
-        
-        if(biddingBlock) {
+
+        if (biddingBlock) {
             biddingBlock.appendChild(sniper_div);
         }
 
         // Public functions
-        this.setMaxBid = function(max_bid) {
+        this.setMaxBid = function (max_bid) {
             max_bid_input.value = max_bid;
         }
 
-        this.setActive = function() {
+        this.setActive = function () {
             sniper_div.classList.add('active');
         }
 
-        this.setInactive = function() {
+        this.setInactive = function () {
             sniper_div.classList.remove('active');
         }
 
-        this.setState = function(text) {
+        this.setState = function (text) {
             state_div.innerText = text;
         }
 
-        this.setToggleButtonText = function(text) {
+        this.setToggleButtonText = function (text) {
             toggle_button.innerText = text;
         }
     }
